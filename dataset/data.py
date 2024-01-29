@@ -78,7 +78,7 @@ import pandas as pd
 
 class AllData_DataFrame(data.Dataset):
 
-    def __init__(self, df_csv, config,train=True,test=False,out_label = 1):
+    def __init__(self, df_csv, config,train=True,test=False,out_label = 2):
         self.train = train
         self.df = pd.read_csv(df_csv)
         self.out_label = out_label
