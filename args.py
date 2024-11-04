@@ -1,7 +1,7 @@
 import argparse
 
 def get_parser():
-    model_names = ["resnet18", "resnet34", "resnet50", "vgg", "dense121", "dense201", "sfcn", "dbn", "fia", "bagnet"]
+    model_names = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152", "dense201", "m3t", "dbn", "vit", "bagnet"]
 
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
     parser.add_argument('--data', metavar='DIR', default='/home/amax/data/yangyanwu/sub_mm', help='path to dataset')
@@ -14,6 +14,7 @@ def get_parser():
     parser.add_argument('--epochs', default=160, type=int, metavar='N', help='number of total epochs to run')
     parser.add_argument('--fold', default=0, type=int, help='fold number')
     parser.add_argument('--da',action='store_true', help='fold number')
+    parser.add_argument('--pad',action='store_true', help='fold number')
     parser.add_argument('-b',
                         '--batch-size',
                         default=32,
@@ -44,15 +45,15 @@ def get_parser():
     parser.add_argument('--T', default=1, type=float, help='alpha value. ')
     parser.add_argument('--ab', default=0, type=int, help='alpha value. ')
     parser.add_argument('--beta', default=0.8, type=float, help='alpha value. ')
-    parser.add_argument('--alpha', default=10, type=float, help='alpha value. ')
+    parser.add_argument('--alpha', default=1, type=float, help='alpha value. ')
     parser.add_argument('--scale', default=5, type=float, help='alpha value. ')
    
-    parser.add_argument('--entropy', default=0.6, type=float, help='alpha value.')
-    parser.add_argument('--spl_weight', default=0.2, type=int, help='spl kd weight. ')
+    parser.add_argument('--ce_weight', default=0.6, type=float, help='spl kd weight. ')
+    parser.add_argument('--kd_weight', default=0.8, type=float, help='spl kd weight. ')
     parser.add_argument('--kd_mode', default=2, type=int, help='training mode. 0: KD, 1: pace_weigth, 2: ours ')
     parser.add_argument('--spl_type', default=1, type=int, help='training mode. 0: hard, 1: soft, 2: log ')
     parser.add_argument('--ce_iter', default=0.003, type=int, help='ce iter weight. ')
-    parser.add_argument('--kd_iter', default=0.004, type=int, help='kd iter weight. ')
+    parser.add_argument('--kd_iter', default=0.003, type=int, help='kd iter weight. ')
     
     
     parser.add_argument('--mode', default=0, type=int, help='training mode. 0: mse, 1: dex, 2: dldl. 0/1/2. +3 == ours. ')
