@@ -84,6 +84,7 @@ class AllData_DataFrame(data.Dataset):
         self.out_label = out_label
         self.fold = config.fold
         self.da = config.da
+        self.pad = config.pad
         if self.da is True:
             print(">>>>>>>>>>>>>>> Big DA for student. <<<<<<<<<<<<<<<<<")
 
@@ -105,13 +106,14 @@ class AllData_DataFrame(data.Dataset):
         if self.train is True:
             print(f"{term} files: {len(self.lists)}, min_label: {min_label}, max_label: {max_label} \
                     label dist: {len([f for f in self.lbls if f ==min_label])}-{len([f for f in self.lbls if f !=min_label])}, ",set(self.lbls))
-        
         self.imgs = np.array(self.lists)
         self.lbls = np.array(self.lbls)
-
+        print(f"term: {term} ", len(self.imgs))
+        print(f"1: {len([f for f in self.lbls if f == 1])} 0: {len([f for f in self.lbls if f == 0])}")
     def __getitem__(self,index, generate_age_dist = False):
         if self.imgs[index].endswith(".nii.gz"):
-            img = nib.load(self.imgs[index]).get_fdata()
+
+            img = nib.load(os.path.join("/raid/yang/t1_data",self.imgs[index].replace('/data5/yang/MIA/process_all/', '')) ).get_fdata()
         elif self.imgs[index].endswith(".npy"):
             img = np.load(self.imgs[index])[0]
         else:
@@ -123,12 +125,14 @@ class AllData_DataFrame(data.Dataset):
         else:
             lbl_y = lbl
             lbl_bc = lbl
-        
+        if self.pad is True:
+            img = np.pad(img, ((18,19),(9,10),(18,19))) # 128*128*128
+        else:
+            img = np.pad(img, ((2,3),(1,2),(2,3))) # 96*112*96
+        # img = np.pad(img, ((18,19),(9,10),(18,19))) # 128*128*128
         if self.train:
-            if self.da is True:
-                img = coordinateTransformWrapper(img,maxDeg=30,maxShift=5, mirror_prob = 0)
-            else:
-                img = coordinateTransformWrapper(img,maxDeg=10,maxShift=5, mirror_prob = 0)
+            img = coordinateTransformWrapper(img,maxDeg=10,maxShift=5, mirror_prob = 0)
+            # img = img
         else:
             img = img
 
