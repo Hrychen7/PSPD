@@ -6,13 +6,16 @@ import random
 import numpy as np
 import warnings
 import math
+import statistics
 from args import get_parser
 from dataset.data import data_prefetcher, AllData_DataFrame
 import torch.distributed as dist
 from models.sfcn_mini import SFCN
 from models.dbnV2 import DBN
-from models.resnetV2 import resnet18, resnet34, resnet50
+from models.resnetV2 import resnet18, resnet34, resnet50, resnet101
 from models.densenetV2 import densenet121, densenet201
+from models.vit import VisionTransformer
+from models.m3t import M3T
 # from apex import amp
 import torch.nn.functional as F
 # from apex.parallel import DistributedDataParallel
@@ -24,7 +27,7 @@ import models.context
 import torch.nn as nn
 from timm.utils import NativeScaler
 from utils.utils import reduce_mean,adjust_learning_rate, AverageMeter, ProgressMeter, my_KLDivLoss
-root = "/data2/chenhr/CReg-KD-main"
+root = "./"
 
 
 def initialize():
@@ -96,35 +99,35 @@ def lambda_scheduler(lambda_0, iter, alpha=0.0001, iter_0=100):
     else:
         lamda = lambda_0 + alpha * iter_0
     return lamda
-def weight_func(func,x,y,lamda,spl_type):
+def weight_funce(func,x,y,lamda,spl_type):
     n=x.shape[0]
     ret = 0.
     for i in range(n):
-        m=curr_v(func(x[i],y[i]),lamda,spl_type)
-        ret += func(x[i],y[i]) *m
+        m=curr_v(func(x[i][None],y[i][None]),lamda,spl_type)
+        ret += func(x[i][None],y[i][None]) *m
     return ret / n
 
-def curr_w(l0,l, lamda):
-        if l > lamda:
-         v = 1./l0 -l / lamda
-        else :
-         v= 1.
-        return v
-def weight_ce(func,x,y,z,w,l):
-    n=x.shape[0]
+def weight_funkd(func1,x1,y1,func2,x2,y2,lamda,spl_type):
+    n=x1.shape[0]
     ret = 0.
-    cc=0.
-    zz=0.
     for i in range(n):
-        p=z[i] +1e-4
-        entropy=-p[0]* math.log(p[0], 2)-p[1]* math.log(p[1], 2)
-        ret += func(x[i],y[i])*curr_w(l,entropy,w)
-        
+        m=curr_v(func2(x2[i][None],y2[i][None]),lamda,spl_type)
+        ret += func1(x1[i],y1[i]) *m
     return ret / n
+def get_loss(fun,x,y,epoch,ratio):
+    n=x.shape[0]
+    ret=[]
+    loss=0.
+    for i in range(n):
+        ret.append(fun(x[i][None],y[i][None]))
+    ret = sorted(ret)
+    nn=min(n, n*ratio+epoch//5)
+    for i in range(int(nn)):
+        loss +=ret[i]
+    return loss/nn
 def main_worker(config, logger):
-    model_names = ["resnet18", "resnet50", "dense121", "sfcn", "dbn"]
-    models = [resnet18, resnet50, densenet121, SFCN, DBN]
-
+    model_names = ["resnet18", "resnet50",  "resnet101", "m3t", "vit"]
+    models = [resnet18, resnet50, resnet101, M3T, VisionTransformer]
     best_acc1 = -99.0
     best_acc2 = -99.0
     best_auc = -99.0
@@ -186,9 +189,9 @@ def main_worker(config, logger):
     cudnn.benchmark = True
 
     # Data loading code
-    train_data = AllData_DataFrame("/data5/yang/brain/dataset/pace_dataset.csv",config, train = True)
-    val_data = AllData_DataFrame("/data5/yang/brain/dataset/pace_dataset.csv",config, train = False)
-    test_data = AllData_DataFrame("/data5/yang/brain/dataset/pace_dataset.csv", config,train = False, test = True)
+    train_data = AllData_DataFrame("dataset/pace_dataset.csv",config, train = True)
+    val_data = AllData_DataFrame("dataset/pace_dataset.csv",config, train = False)
+    test_data = AllData_DataFrame("dataset/pace_dataset.csv", config,train = False, test = True)
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_data)
     val_sampler = torch.utils.data.distributed.DistributedSampler(val_data)
@@ -200,16 +203,15 @@ def main_worker(config, logger):
                         shuffle=False,num_workers=8,pin_memory = False, sampler = val_sampler)
     test_loader = DataLoader(test_data,config.batch_size,
                        shuffle=False,num_workers=8,pin_memory = False, sampler = test_sampler)
-
+    print(config.ce_weight)
     check_path = os.path.join(root,"checkpoints/mine/%s" % config.env_name)
+    best_test_acc  = -1
+    save_lbl = 0
+    save_pred = 0
     for epoch in range(config.epochs):
-        # if epoch>0:
-        #     use_file = os.path.join(root,check_path, f'{config.env_name}_last')
-        #     checkpoint = torch.load(use_file, map_location='cpu') 
-        #     all_model.module.load_previous_time(checkpoint['s_state_dict'])
         train_sampler.set_epoch(epoch)
 
-        adjust_learning_rate(optimizer, epoch, config)
+        # adjust_learning_rate(optimizer, epoch, config)
         import time
         # train for one epoch
         st_time = time.time()
@@ -217,14 +219,16 @@ def main_worker(config, logger):
         end_time = time.time()
         run_time = end_time - st_time
         logger.info(f"Running time for epoch: {run_time}")
-        acc,auc = validate(val_loader,all_model, config, logger, prefix = "val")
-        
+        acc,auc,_,_ = validate(val_loader,all_model, config, logger, prefix = "val")
 
         is_best = (acc > best_acc1) or (acc == best_acc1 and auc > best_auc)
         if is_best:
-         test_acc,_ = validate(test_loader,all_model, config, logger, prefix = "test")
-         print(test_acc)
-         
+            test_acc,_, test_lbl, test_pred = validate(test_loader,all_model, config, logger, prefix = "test")
+            best_test_acc = test_acc
+            save_lbl = test_lbl
+            save_pred = test_pred
+
+        logger.info(f"best acc: {best_test_acc:.4f}")
         best_acc1 = max(acc, best_acc1)
         best_auc = max(auc, best_auc)
         
@@ -234,16 +238,15 @@ def main_worker(config, logger):
             except:
                 pass # multiple processors bug
         state = {
-                    'epoch': epoch + 1,
-                    'state_dict': all_model.module.state_dict(),
-                    's_state_dict': all_model.module.student.state_dict(),
-                    'best_acc1': best_acc1,
-                    # 'amp': amp.state_dict(),
-                    # 'optimizer': optimizer.state_dict(),
+                'epoch': epoch + 1,
+                'state_dict': all_model.module.state_dict(),
+                's_state_dict': all_model.module.student.state_dict(),
+                'best_acc1': best_acc1,
+                'lbl': save_lbl,
+                'pred': save_pred,
                 }
         if  dist.get_rank() == 0 and is_best:
-          torch.save(state, os.path.join(root, f'{check_path}/{config.env_name}_epoch_{epoch}_{acc}'))
-        # torch.save(state, os.path.join(root, f'{check_path}/{config.env_name}_last'))
+            torch.save(state, os.path.join(root, f'{check_path}/{config.env_name}_epoch_{epoch}_{acc}'))
 
 def accuracy(output, labels):
     preds = output.max(1)[1].type_as(labels)
@@ -258,8 +261,8 @@ def train(train_loader, all_model,loss_scaler, optimizer, epoch, config,logger):
     
     progress = ProgressMeter(len(train_loader), [losses, loss_acc],
                               prefix="Epoch: [{}]".format(epoch), logger = logger)
-    lamdakd = lambda_scheduler(config.spl_weight, epoch, alpha=config.kd_iter)
-    lamdace = lambda_scheduler(config.entropy, epoch, alpha=config.ce_iter)
+    lamdakd = lambda_scheduler(config.kd_weight, epoch, alpha=config.kd_iter)
+    #lamdace = lambda_scheduler(config.ce_weight, epoch, alpha=config.ce_iter)
    
     
     all_model.module.to_train()
@@ -271,21 +274,25 @@ def train(train_loader, all_model,loss_scaler, optimizer, epoch, config,logger):
     optimizer.step()
     logger.info(f"scale:{config.scale},tem:{config.T}")
     while images is not None:
-        out_t, out_s = all_model(images, config.T)
-        if epoch < 1:
-          loss = F.nll_loss(out_s['y'], target)  
+        if epoch <1:
+            out_s = all_model(images, config.T,is_train = False)
+            loss = get_loss(F.nll_loss,out_s['y'],target,epoch+1,config.ce_weight) 
         else:
-          if config.kd_mode==2:  # ours
-             loss_kd = config.T * config.T *weight_func(torch.nn.KLDivLoss(),out_s['y_tem'], out_t['p'],lamdakd,spl_type=config.spl_type)
-             loss_ce = weight_ce(F.nll_loss,out_s['y'],target,out_t['p'],lamdace,config.entropy)
-             loss = loss_ce + loss_kd *config.alpha 
-          elif  config.kd_mode==1: # pace-weight
-             loss_kd = config.T * config.T *weight_func(torch.nn.KLDivLoss(),out_s['y_tem'], out_t['p'],lamdakd,spl_type=config.spl_type)
-             loss=F.nll_loss(out_s['y'], target) + loss_kd * config.alpha 
-          else:# vallina kd
-             criterion=torch.nn.KLDivLoss() 
-             loss_kd = config.T * config.T *(criterion(out_s['y_tem'], out_t['p']))
-             loss = F.nll_loss(out_s['y'], target) + loss_kd * config.alpha 
+            if config.kd_mode==2:  # ours
+                out_t, out_s = all_model(images, config.T,is_train = True)
+                # loss_kd = config.T * config.T *weight_func(torch.nn.KLDivLoss(),out_s['y_tem'], out_t['p'],lamdakd,spl_type=config.spl_type)
+                loss_kd = config.T * config.T *weight_funkd(torch.nn.KLDivLoss(),out_s['y_tem'], out_t['p'],F.nll_loss,out_t['y'],target,lamdakd,spl_type=config.spl_type)
+                #loss_ce = get_loss(F.nll_loss,out_s['y'],target,epoch+1)
+                loss = get_loss(F.nll_loss,out_s['y'],target,epoch+1,config.ce_weight)  + loss_kd *config.alpha 
+            elif  config.kd_mode==1: # pace-weight
+                out_s = all_model(images, config.T,is_train = False)
+                #loss_kd = config.T * config.T *weight_funkd(torch.nn.KLDivLoss(),out_s['y_tem'], out_t['p'],F.nll_loss,out_t['y'],target,lamdakd,spl_type=config.spl_type)
+                loss=get_loss(F.nll_loss,out_s['y'],target,epoch+1,config.ce_weight)   #+ loss_kd * config.alpha 
+            else:# vallina kd
+                out_t, out_s = all_model(images, config.T,is_train = True)
+                criterion=torch.nn.KLDivLoss() 
+                loss_kd = config.T * config.T *(criterion(out_s['y_tem'], out_t['p']))
+                loss = F.nll_loss(out_s['y'], target) + loss_kd * config.alpha 
           
 
         acc = accuracy(out_s['y'],target)
@@ -297,7 +304,7 @@ def train(train_loader, all_model,loss_scaler, optimizer, epoch, config,logger):
         loss_acc.update(reduced_acc.item(), images.size(0))
 
         optimizer.zero_grad()
-        loss_scaler(loss, optimizer, parameters=all_model.module.student.parameters(),clip_grad=1,clip_mode='value')
+        loss_scaler(loss, optimizer, parameters=all_model.module.student.parameters())
         # with amp.scale_loss(loss, optimizer) as scaled_loss:
         #     scaled_loss.backward()
         optimizer.step()
@@ -322,6 +329,7 @@ def validate(val_loader, model, config, logger, prefix = ""):
 
     preds = []
     lbls = []
+    outs = []
     lbl_onehot = np.zeros((len(lbls), len(np.unique(lbls))))
     for i in range(len(lbls)):
         lbl_onehot[i,lbls[i]]=1
@@ -333,7 +341,7 @@ def validate(val_loader, model, config, logger, prefix = ""):
             acc = accuracy(out['y'], target)
             preds.extend(out['y'].max(1)[1].cpu().detach().numpy())
             lbls.extend(target.cpu().detach().numpy())
-
+            outs.extend(out['y'].cpu().detach().numpy())
             torch.distributed.barrier()
             reduced_acc = reduce_mean(acc, config.nprocs)
             loss_metric.update(reduced_acc.item(), images.size(0))
@@ -347,7 +355,7 @@ def validate(val_loader, model, config, logger, prefix = ""):
         logger.info(f"\033[32m >>>>>>>> [{prefix}-acc]: {round(float(loss_metric.avg),4)}\
                     | auc: {auc} | recall: {eval_sen} | spe: {eval_spe} \033[0m")
 
-    return round(loss_metric.avg,4),auc
+    return round(loss_metric.avg,4),auc, np.array(lbls), np.array(outs)
 
 
 if __name__ == '__main__':
