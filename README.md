@@ -1,13 +1,7 @@
-# 🧠 Regularizing Brain Age Prediction via Gated Knowledge Distillation
+# 🧠 Advancing Brain Imaging Analysis Step-by-step  via Progressive Self-paced Learning
 
-This repository implements **Brain Age Prediction** using **Gated Knowledge Distillation (GKD)** regularization, based on PyTorch.
-
-The method is trained and evaluated on four public brain imaging datasets:
-
-- [IXI Dataset](http://brain-development.org/)
-- [OASIS-3](https://www.oasis-brains.org/)
+The method is trained and evaluated on ADNI:
 - [ADNI](https://ida.loni.usc.edu/)
-- [1000 Functional Connectomes Project (FCP)](http://www.nitrc.org/projects/fcon_1000)
 
 ---
 
@@ -18,14 +12,41 @@ The method is trained and evaluated on four public brain imaging datasets:
 All MRI images should be preprocessed and z-score normalized.
 
 > 🔧 **Preprocessing code is in preparation.**  
-> In the meantime, we recommend using [intensity-normalization](https://github.com/jcreinhold/intensity-normalization) for intensity normalization.
+All MRI images need to be preprocessed and z-score normalization.
 
----
+The preprocess pipeline code is in preparation
+
+We recommend the normalization using: https://github.com/jcreinhold/intensity-normalization
 
 ### 📦 Requirements
+>apex  
+>transformations  
+>pytorch  
+>numpy  
+>logging  
+>nibabel  
+>sklearn
 
-Install the following dependencies:
+Install apex using source code: https://github.com/NVIDIA/apex  
+Others can be installed by pip or conda  
+---
 
-```bash
-pip install torch torchvision nibabel numpy scikit-learn transformations logging
+Run :
+```shell
+CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch \
+                        --nproc_per_node=1 \
+                        --master_port 51321 \
+                        PSPD.py 
+
+```
+
+Cite:  
+>{@inproceedings{yang2024advancing,
+  title={Advancing Brain Imaging Analysis Step-by-Step via Progressive Self-paced Learning},
+  author={Yang, Yanwu and Chen, Hairui and Hu, Jiesi and Guo, Xutao and Ma, Ting},
+  booktitle={International Conference on Medical Image Computing and Computer-Assisted Intervention},
+  pages={58--68},
+  year={2024},
+  organization={Springer}
+}
 
