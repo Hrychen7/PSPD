@@ -26,6 +26,7 @@ We recommend the normalization using: https://github.com/jcreinhold/intensity-no
 >logging  
 >nibabel  
 >sklearn
+
 Install apex using source code: https://github.com/NVIDIA/apex  
 Others can be installed by pip or conda  
 ---
