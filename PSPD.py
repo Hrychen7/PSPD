@@ -92,8 +92,7 @@ def curr_v(l, lamda, spl_type='hard'):
 
     else:
         raise NotImplementedError('Not implemented of spl type {}'.format(spl_type))
-    eps = 1e-8  # 或者更小，比如 1e-12
-    v  = v + eps
+    
     return v
 def lambda_scheduler(lambda_0, iter, alpha=0.0001, iter_0=100):
     if iter < iter_0:
