@@ -1,21 +1,31 @@
-# PSPD
-Run :
+# 🧠 Regularizing Brain Age Prediction via Gated Knowledge Distillation
 
-Train Teacher model:
-```
-CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch \
-                        --nproc_per_node=1 \
-                        --master_port 51321 \
-                        run_teacher.py \
-```  
-Train Student model by adding teacher path (-t)
-```shell
-CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch \
-                        --nproc_per_node=1 \
-                        --master_port 51321 \
-                        pspd.py \
-                        -b 64 \
-                        --epochs 300 \
-                        --lr 0.0003 \
-                        --data /path/to/data \
-```
+This repository implements **Brain Age Prediction** using **Gated Knowledge Distillation (GKD)** regularization, based on PyTorch.
+
+The method is trained and evaluated on four public brain imaging datasets:
+
+- [IXI Dataset](http://brain-development.org/)
+- [OASIS-3](https://www.oasis-brains.org/)
+- [ADNI](https://ida.loni.usc.edu/)
+- [1000 Functional Connectomes Project (FCP)](http://www.nitrc.org/projects/fcon_1000)
+
+---
+
+## 🛠️ Setup
+
+### 🔄 Preprocessing
+
+All MRI images should be preprocessed and z-score normalized.
+
+> 🔧 **Preprocessing code is in preparation.**  
+> In the meantime, we recommend using [intensity-normalization](https://github.com/jcreinhold/intensity-normalization) for intensity normalization.
+
+---
+
+### 📦 Requirements
+
+Install the following dependencies:
+
+```bash
+pip install torch torchvision nibabel numpy scikit-learn transformations logging
+
