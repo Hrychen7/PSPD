@@ -181,7 +181,7 @@ class ResNet(nn.Module):
                 m.bias.data.zero_()
         if self.mode == 0:
             self.f1 = nn.Conv3d(output_dim, 44, padding=0, kernel_size=1)
-            self.f2 = nn.Conv3d(44, 22, padding=0, kernel_size=1)
+            self.f2 = nn.Conv3d(44, 2, padding=0, kernel_size=1)
 
     def _make_layer(self, block, planes, blocks, shortcut_type, stride=1, dilation=1):
         downsample = None
