@@ -1,4 +1,5 @@
 #coding:utf8
+#coding:utf8
 import os
 from torch.utils import data
 
@@ -113,7 +114,7 @@ class AllData_DataFrame(data.Dataset):
     def __getitem__(self,index, generate_age_dist = False):
         if self.imgs[index].endswith(".nii.gz"):
 
-            img = nib.load(os.path.join("/raid/yang/t1_data",self.imgs[index].replace('/data5/yang/MIA/process_all/', '')) ).get_fdata()
+            img = nib.load(os.path.join("/mnt/sdb/chr/PSPD",self.imgs[index].replace('/data5/yang/MIA/process_all/', '')) ).get_fdata()
         elif self.imgs[index].endswith(".npy"):
             img = np.load(self.imgs[index])[0]
         else:
