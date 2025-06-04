@@ -1,6 +1,9 @@
 
 # 🧠 Advancing Brain Imaging Analysis Step-by-step via Progressive Self-paced Learning
 
+![Overview](./assets/PSPD.jpg)
+> **Overview**:The architecture of the proposed PSPD, where the teacher model is derived from the models trained at previous epochs. We first establish a decoupled curriculum setting that considers both the current and past states of the model, and then train the model based on this setting for learning and distillation.
+
 The method is trained and evaluated on:
 
 - [ADNI](https://ida.loni.usc.edu/)
