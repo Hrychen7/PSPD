@@ -196,7 +196,7 @@ def main_worker(config, logger):
                         shuffle=False,num_workers=8,pin_memory = False, sampler = val_sampler)
     test_loader = DataLoader(test_data,config.batch_size,
                        shuffle=False,num_workers=8,pin_memory = False, sampler = test_sampler)
-    print(config.ce_weight)
+    
     check_path = os.path.join(root,"checkpoints/mine/%s" % config.env_name)
     best_test_acc  = -1
     save_lbl = 0
